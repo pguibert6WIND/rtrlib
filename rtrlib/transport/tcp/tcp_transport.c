@@ -18,6 +18,7 @@
 #include <unistd.h>
 
 #include "rtrlib/lib/alloc_utils_private.h"
+#include "rtrlib/lib/vrf.h"
 #include "rtrlib/lib/log_private.h"
 #include "rtrlib/rtrlib_export_private.h"
 #include "rtrlib/transport/tcp/tcp_transport_private.h"
@@ -54,19 +55,33 @@ int tr_tcp_open(void *tr_socket)
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_ADDRCONFIG;
+    if (vrf_netns_api_usable(tcp_socket->config.vrfname) < 0) {
+      TCP_DBG("vrf netns API for %s can not be used",
+              tcp_socket, tcp_socket->config.vrfname == NULL ?
+              "Default" : tcp_socket->config.vrfname);
+      return TR_ERROR;
+    }
+    vrf_netns_switch_to(tcp_socket->config.vrfname);
     if(getaddrinfo(tcp_socket->config.host, tcp_socket->config.port, &hints, &res) != 0) {
         TCP_DBG("getaddrinfo error, %s", tcp_socket, gai_strerror(errno));
+        vrf_netns_switchback();
         return TR_ERROR;
     }
+    vrf_netns_switchback();
 
-    if ((tcp_socket->socket = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1) {
+    if ((tcp_socket->socket = vrf_netns_socket(res->ai_family,
+                                               res->ai_socktype,
+                                               res->ai_protocol,
+                                               tcp_socket->config.vrfname)) == -1) {
         TCP_DBG("Socket creation failed, %s", tcp_socket, strerror(errno));
         goto end;
     }
 
     if (tcp_socket->config.bindaddr) {
+        vrf_netns_switch_to(tcp_socket->config.vrfname);
         if (getaddrinfo(tcp_socket->config.bindaddr, 0, &hints, &bind_addrinfo) != 0) {
             TCP_DBG("getaddrinfo error, %s", tcp_socket, gai_strerror(errno));
+            vrf_netns_switchback();
             goto end;
         }
 
@@ -111,6 +126,8 @@ void tr_tcp_free(struct tr_socket *tr_sock)
     TCP_DBG1("Freeing socket", tcp_sock);
 
     lrtr_free(tcp_sock->config.host);
+    if (tcp_sock->config.vrfname)
+      lrtr_free(tcp_sock->config.vrfname);
     lrtr_free(tcp_sock->config.port);
     lrtr_free(tcp_sock->config.bindaddr);
 
@@ -209,6 +226,10 @@ RTRLIB_EXPORT int tr_tcp_init(const struct tr_tcp_config *config, struct tr_sock
     struct tr_tcp_socket *tcp_socket = socket->socket;
     tcp_socket->socket = -1;
     tcp_socket->config.host = lrtr_strdup(config->host);
+    if (config->vrfname)
+      tcp_socket->config.vrfname = lrtr_strdup(config->vrfname);
+    else
+      tcp_socket->config.vrfname = NULL;
     tcp_socket->config.port = lrtr_strdup(config->port);
     if (config->bindaddr) {
         tcp_socket->config.bindaddr = lrtr_strdup(config->bindaddr);

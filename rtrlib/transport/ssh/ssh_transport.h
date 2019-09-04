@@ -41,6 +41,7 @@
  */
 struct tr_ssh_config {
     char *host;
+    char *vrfname;
     unsigned int port;
     char *bindaddr;
     char *username;

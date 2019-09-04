@@ -32,6 +32,7 @@
  */
 struct tr_tcp_config {
     char *host;
+    char *vrfname;
     char *port;
     char *bindaddr;
 };

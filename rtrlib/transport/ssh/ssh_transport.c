@@ -17,6 +17,7 @@
 #include <libssh/libssh.h>
 
 #include "rtrlib/lib/alloc_utils_private.h"
+#include "rtrlib/lib/vrf.h"
 #include "rtrlib/lib/log_private.h"
 #include "rtrlib/lib/utils_private.h"
 #include "rtrlib/rtrlib_export_private.h"
@@ -67,11 +68,20 @@ int tr_ssh_open(void *socket)
 
     if (config->client_privkey_path != NULL)
         ssh_options_set(ssh_socket->session, SSH_OPTIONS_IDENTITY, config->client_privkey_path);
+    if (vrf_netns_api_usable(ssh_socket->config.vrfname) < 0) {
+      SSH_DBG("tr_ssh_init: vrf netns api for %s can not be used",
+               ssh_socket, ssh_socket->config.vrfname == NULL ?
+               "Default" : ssh_socket->config.vrfname);
+      goto error;
+    }
 
+    vrf_netns_switch_to(ssh_socket->config.vrfname);
     if(ssh_connect(ssh_socket->session) == SSH_ERROR) {
         SSH_DBG1("tr_ssh_init: opening SSH connection failed", ssh_socket);
+        vrf_netns_switchback();
         goto error;
     }
+    vrf_netns_switchback();
 
     //check server identity
     if((config->server_hostkey_path != NULL) && (ssh_is_server_known(ssh_socket->session) != SSH_SERVER_KNOWN_OK)) {
@@ -136,6 +146,8 @@ void tr_ssh_free(struct tr_socket *tr_sock)
     SSH_DBG1("Freeing socket", tr_ssh_sock);
 
     lrtr_free(tr_ssh_sock->config.host);
+    if (tr_ssh_sock->config.vrfname)
+      lrtr_free(tr_ssh_sock->config.vrfname);
     lrtr_free(tr_ssh_sock->config.bindaddr);
     lrtr_free(tr_ssh_sock->config.username);
     lrtr_free(tr_ssh_sock->config.client_privkey_path);
@@ -222,6 +234,10 @@ RTRLIB_EXPORT int tr_ssh_init(const struct tr_ssh_config *config, struct tr_sock
     ssh_socket->channel = NULL;
     ssh_socket->session = NULL;
     ssh_socket->config.host = lrtr_strdup(config->host);
+    if (config->vrfname)
+      ssh_socket->config.vrfname = lrtr_strdup(config->vrfname);
+    else
+      ssh_socket->config.vrfname = NULL;
     ssh_socket->config.port = config->port;
     ssh_socket->config.username = lrtr_strdup(config->username);
 
