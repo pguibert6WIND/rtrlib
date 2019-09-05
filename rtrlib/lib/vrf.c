@@ -39,6 +39,8 @@ static int vrf_netns_default_fd;
 static int vrf_netns_current_fd;
 static int vrf_netns_not_available;
 static int vrf_netns_activate;
+static uid_t zuid; /* uid to run as */
+static uid_t zsuid; /* saved uid */
 
 #ifndef CLONE_NEWNET
 #define CLONE_NEWNET 0x40000000
@@ -57,6 +59,12 @@ static inline int setns(int fd, int nstype)
 }
 #endif /* !HAVE_SETNS */
 
+static void vrf_netns_seteuid(uid_t uid)
+{
+  if (uid == 0)
+    return;
+  seteuid(uid);
+}
 
 static char *vrf_netns_pathname(const char *netns_name)
 {
@@ -79,11 +87,15 @@ static char *vrf_netns_pathname(const char *netns_name)
 	return pathname;
 }
 
-RTRLIB_EXPORT void vrf_netns_init(void)
+RTRLIB_EXPORT void vrf_netns_init(uid_t *zuid_ptr, uid_t *zsuid_ptr)
 {
   vrf_netns_default_fd = open(VRF_NETNS_DEFAULT_NAME, O_RDONLY);
   if (vrf_netns_default_fd < 0)
     vrf_netns_not_available = 1;
+  if (zuid_ptr)
+    zuid = *zuid_ptr;
+  if (zsuid_ptr)
+    zsuid = *zsuid_ptr;
   return;
 }
 
@@ -109,7 +121,9 @@ RTRLIB_EXPORT int vrf_netns_switch_to(const char *name)
     errno = EINVAL;
     return -1;
   }
+  vrf_netns_seteuid(zsuid);
   ret = setns(fd, CLONE_NEWNET);
+  vrf_netns_seteuid(zuid);
   if (ret < 0)
     return ret;
   vrf_netns_current_fd = fd;
@@ -141,8 +155,10 @@ RTRLIB_EXPORT int vrf_netns_switchback(void)
   if (!vrf_netns_activate || vrf_netns_not_available)
     return ret;
   if (vrf_netns_current_fd != -1 && vrf_netns_default_fd != -1) {
+    vrf_netns_seteuid(zsuid);
     ret = setns(vrf_netns_default_fd, CLONE_NEWNET);
     vrf_netns_current_fd = -1;
+    vrf_netns_seteuid(zuid);
   }
   return ret;
 }

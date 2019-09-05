@@ -1,7 +1,7 @@
 #ifndef LRTR_UTILS_VRF_H
 #define LRTR_UTILS_VRF_H
 
-void vrf_netns_init(void);
+void vrf_netns_init(uid_t *zuid_ptr, uid_t *zsuid_ptr);
 int vrf_netns_api_usable(const char *name);
 int vrf_netns_switchback(void);
 int vrf_netns_switch_to(const char *name);
