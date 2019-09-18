@@ -18,10 +18,10 @@
 const int connection_timeout = 20;
 enum rtr_mgr_status connection_status = -1;
 
-static void connection_status_callback(const struct rtr_mgr_group *group,
+static void connection_status_callback(const struct rtr_mgr_group *group __attribute__((unused)),
 				       enum rtr_mgr_status status,
-				       const struct rtr_socket *socket,
-				       void *data)
+				       const struct rtr_socket *socket __attribute__((unused)),
+				       void *data __attribute__((unused)))
 {
 	if (status == RTR_MGR_ERROR)
 		connection_status = status;
@@ -36,8 +36,9 @@ static int connection_error(enum rtr_mgr_status status)
 	 */
 		char input[256];
 
-		if (fgets(input, 256, stdin))
+		if (fgets(input, 256, stdin)) {
 			;
+		}
 		printf("error\n");
 		fflush(stdout);
 		return 1;
@@ -103,8 +104,9 @@ int main(int argc, char *argv[])
 			 * to avoid "broken pipee error while communicating
 			 * with the Python program
 			 */
-			if (fgets(input, 256, stdin))
+			if (fgets(input, 256, stdin)) {
 				;
+			}
 			printf("timeout\n");
 			fflush(stdout);
 			return EXIT_FAILURE;

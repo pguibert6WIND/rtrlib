@@ -17,10 +17,10 @@
 #define RPKI_CACHE_POST "8283"
 
 struct test_validity_query {
-	char *pfx;
+	const char *pfx;
 	int len;
 	int asn;
-	int val;
+	unsigned int val;
 };
 
 /*
@@ -41,10 +41,10 @@ const struct test_validity_query queries[] = {
 const int connection_timeout = 20;
 enum rtr_mgr_status connection_status = -1;
 
-static void connection_status_callback(const struct rtr_mgr_group *group,
+static void connection_status_callback(const struct rtr_mgr_group *group __attribute__((unused)),
 				       enum rtr_mgr_status status,
-				       const struct rtr_socket *socket,
-				       void *data)
+				       const struct rtr_socket *socket __attribute__((unused)),
+				       void *data __attribute__((unused)))
 {
 	if (status == RTR_MGR_ERROR)
 		connection_status = status;
@@ -61,6 +61,7 @@ int main(void)
 	/* create a TCP transport socket */
 	struct tr_socket tr_tcp;
 	struct tr_tcp_config tcp_config = { RPKI_CACHE_HOST,
+					    NULL,
 					    RPKI_CACHE_POST,
 					    NULL };
 	struct rtr_socket rtr_tcp;

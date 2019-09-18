@@ -60,7 +60,8 @@ static int memfile_close(FILE *file, char **buffer, size_t *size)
 	return rc;
 }
 #else
-static FILE *memfile_open(char **buffer, size_t *size)
+static FILE *memfile_open(char **buffer __attribute__((unused)),
+                          size_t *size __attribute__((unused)))
 {
 	return tmpfile();
 }
